@@ -1,8 +1,10 @@
 [package]
 name = "radsort"
+description = "Radix sort implementation for sorting by scalar keys (numbers, floats, chars, bools)"
 version = "0.0.0"
 authors = ["Jakub Valtar <jakub.valtar@gmail.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
