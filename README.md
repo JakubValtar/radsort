@@ -13,8 +13,8 @@ of supported keys.
 
 - best and worst-case running time is `O(n)` – see [benchmarks] for more
 detailed performance characteristics
-- space complexity is `O(n)` – direct sort allocates temporary storage the
-size of the slice, for indirect see [`sort_by_cached_key`]
+- space complexity is `O(n)` – allocates temporary storage the
+size of the slice, for indirect sort see [`sort_by_cached_key`]
 - stable, i.e. does not reorder equal elements
 - uses `#![no_std]`, but needs an allocator
 
