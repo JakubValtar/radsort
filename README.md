@@ -36,14 +36,14 @@ published at
 with select optimizations published by Michael Herf at
 [http://stereopsis.com/radix.html](http://stereopsis.com/radix.html).
 
-# Floating-point numbers
+## Floating-point numbers
 
 Floating-point number keys are effectively sorted according to their partial
 order (see [`PartialOrd`]), with `NaN` values at the beginning (before the
 negative infinity) and at the end (after the positive infinity), depending
 on the sign bit of each `NaN`.
 
-# Examples
+## Examples
 
 Slices of scalar types (integers, floating-point numbers, Booleans, and
 characters) can be sorted directly:
