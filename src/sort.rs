@@ -11,11 +11,7 @@ use crate::Key;
 /// These keys can be sorted bitwise. For conversion from scalar types, see
 /// [`Scalar::to_radix_key()`].
 /// 
-/// Mapping of floating point numbers onto unsigned integers is a bit more
-/// involved, see the `Key` implementation for details.
-/// 
-/// [`Scalar::to_radix_key()`]: fn.sort_by_key.html
-/// [`Key::to_radix_key`]: fn.sort_by_key.html
+/// [`Scalar::to_radix_key()`]: ../scalar/trait.Scalar.html#tymethod.to_radix_key
 pub trait RadixKey: Key {
 
     /// Sorts the slice using provided key extraction function.
