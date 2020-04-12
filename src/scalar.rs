@@ -31,7 +31,19 @@ macro_rules! key_impl_unsigned {
     )
 }
 
-key_impl_unsigned! { u8 u16 u32 u64 u128 usize }
+key_impl_unsigned! { u8 u16 u32 u64 u128 }
+
+#[cfg(target_pointer_width = "16")]
+key_impl_unsigned!(usize => u16);
+
+#[cfg(target_pointer_width = "32")]
+key_impl_unsigned!(usize => u32);
+
+#[cfg(target_pointer_width = "64")]
+key_impl_unsigned!(usize => u64);
+
+#[cfg(target_pointer_width = "128")]
+key_impl_unsigned!(usize => u128);
 
 key_impl_unsigned!(bool => u8);
 key_impl_unsigned!(char => u32);
@@ -73,9 +85,20 @@ key_impl_signed! {
     i16 => u16,
     i32 => u32,
     i64 => u64,
-    i128 => u128,
-    isize => usize
+    i128 => u128
 }
+
+#[cfg(target_pointer_width = "16")]
+key_impl_signed!(isize => u16);
+
+#[cfg(target_pointer_width = "32")]
+key_impl_signed!(isize => u32);
+
+#[cfg(target_pointer_width = "64")]
+key_impl_signed!(isize => u64);
+
+#[cfg(target_pointer_width = "128")]
+key_impl_signed!(isize => u128);
 
 
 /// Implements `Scalar` for a floating-point number type(s).

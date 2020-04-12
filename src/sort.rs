@@ -230,7 +230,7 @@ macro_rules! radix_key_impl {
     )*)
 }
 
-radix_key_impl!{ u8 u16 u32 u64 u128 usize }
+radix_key_impl!{ u8 u16 u32 u64 u128 }
 
 
 /// Double buffer. Allocates a temporary memory the size of the slice, so that
