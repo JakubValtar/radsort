@@ -41,13 +41,14 @@ pub trait RadixKey: Key {
         Self::radix_sort_usize(slice, |t| key_fn(t), unopt);
     }
 
-    /// Sorting for slices with up to u32::MAX elements, which is a majority of
-    /// cases. Uses u32 indices for histograms and offsets to save cache space.
+    /// Sorting for slices with up to `u32::MAX` elements, which is a majority
+    /// of cases. Uses `u32` indices for histograms and offsets to save cache
+    /// space.
     #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
     fn radix_sort_u32<T, F>(slice: &mut[T], key_fn: F, unopt: bool)
         where F: FnMut(&T) -> Self;
 
-    /// Sorting function for slices with up to usize::MAX elements.
+    /// Sorting function for slices with up to `usize::MAX` elements.
     fn radix_sort_usize<T, F>(slice: &mut[T], key_fn: F, unopt: bool)
         where F: FnMut(&T) -> Self;
 }
@@ -83,7 +84,7 @@ macro_rules! sort_impl {
             }
             
 
-            // In the worst case (u128 key, input len >= u32::MAX) uses 32 KiB on the stack.
+            // In the worst case (`u128` key, `input.len() >= u32::MAX`) uses 32 KiB on the stack.
             let mut offsets = [[0 as $offset_type; BUCKET_COUNT]; DIGIT_COUNT];
             let mut skip_digit = [false; DIGIT_COUNT];
 
