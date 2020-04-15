@@ -99,7 +99,7 @@ macro_rules! sort_impl {
                 }
                 
                 if digit_skip_enabled {
-                    // For each digit, gheck if all the elements are in the same bucket.
+                    // For each digit, check if all the elements are in the same bucket.
                     // If so, we can skip the whole digit. Instead of checking all the buckets,
                     // we pick a key and check whether the bucket contains all the elements.
                     let last_key = key_fn(input.last().unwrap());
@@ -256,9 +256,8 @@ struct DoubleBuffer<'a, T> {
     read_buf: *const T,
 
     /// Write buffer is write-only. Elements can be present multiple times or
-    /// not at all. The caller must ensure that by the time of calling `swap`
-    /// it has a complete set of elements and each element is present exactly
-    /// once.
+    /// not at all. The caller must ensure that it is consistent before calling
+    /// `swap`.
     write_buf: *mut T,
 }
 
@@ -303,7 +302,7 @@ impl<'a, T> DoubleBuffer<'a, T> {
     /// this function.
     unsafe fn swap(&mut self) {
         // The cast is ok, we have an exclusive access to both buffers
-        // (&mut [T] and Vec<T>). The user guarantees that the write buffer is
+        // (&mut [T] and Vec<T>). The caller guarantees that the write buffer is
         // consistent and therefore it's safe to read from it and use it as a
         // read buffer.
         let temp = self.write_buf as *const T;
