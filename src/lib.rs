@@ -95,6 +95,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
+mod double_buffer;
 mod scalar;
 mod sort;
 
