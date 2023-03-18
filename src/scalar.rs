@@ -56,7 +56,7 @@ key_impl_unsigned!(char => u32);
 /// When we cast to an unsigned integer, we end up with negative integers
 /// ordered after positive integers. To correct the order, we flip the sign bit.
 ///
-/// ```ignore
+/// ```plaintext
 /// -128: 1000_0000    0000_0000
 ///   -1: 1111_1111    0111_0000
 ///    0: 0000_0000 -> 1000_0000
@@ -129,7 +129,7 @@ key_impl_signed!(isize => u128);
 /// These are halfs (~`f16`) for brevity, `f32` and `f64` only have more bits in
 /// the middle.
 ///
-/// ```ignore
+/// ```plaintext
 /// negative NaN  1_11111_xxxxxxxxx1    0_00000_xxxxxxxxx0
 /// NEG_INFINITY  1_11111_0000000000    0_00000_1111111111
 /// MIN           1_11110_1111111111 -> 0_00001_0000000000  flip all the bits
