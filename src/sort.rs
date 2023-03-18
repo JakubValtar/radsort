@@ -1,4 +1,3 @@
-
 //! Implementations of radix keys and sorting functions.
 
 use alloc::vec::Vec;
@@ -7,18 +6,18 @@ use core::mem;
 use crate::Key;
 
 /// Unsigned integers used as sorting keys for radix sort.
-/// 
+///
 /// These keys can be sorted bitwise. For conversion from scalar types, see
 /// [`Scalar::to_radix_key()`].
-/// 
+///
 /// [`Scalar::to_radix_key()`]: ../scalar/trait.Scalar.html#tymethod.to_radix_key
 pub trait RadixKey: Key {
-
     /// Sorts the slice using provided key extraction function.
     /// Runs one of the other functions, based on the length of the slice.
     #[inline]
-    fn radix_sort<T, F>(slice: &mut[T], mut key_fn: F, unopt: bool)
-        where F: FnMut(&T) -> Self
+    fn radix_sort<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
+    where
+        F: FnMut(&T) -> Self,
     {
         // Sorting has no meaningful behavior on zero-sized types.
         if mem::size_of::<T>() == 0 {
@@ -27,7 +26,7 @@ pub trait RadixKey: Key {
 
         let len = slice.len();
         if len < 2 {
-           return;
+            return;
         }
 
         #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
@@ -37,7 +36,7 @@ pub trait RadixKey: Key {
                 return;
             }
         }
-        
+
         Self::radix_sort_usize(slice, |t| key_fn(t), unopt);
     }
 
@@ -45,19 +44,22 @@ pub trait RadixKey: Key {
     /// of cases. Uses `u32` indices for histograms and offsets to save cache
     /// space.
     #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
-    fn radix_sort_u32<T, F>(slice: &mut[T], key_fn: F, unopt: bool)
-        where F: FnMut(&T) -> Self;
+    fn radix_sort_u32<T, F>(slice: &mut [T], key_fn: F, unopt: bool)
+    where
+        F: FnMut(&T) -> Self;
 
     /// Sorting function for slices with up to `usize::MAX` elements.
-    fn radix_sort_usize<T, F>(slice: &mut[T], key_fn: F, unopt: bool)
-        where F: FnMut(&T) -> Self;
+    fn radix_sort_usize<T, F>(slice: &mut [T], key_fn: F, unopt: bool)
+    where
+        F: FnMut(&T) -> Self;
 }
 
 macro_rules! sort_impl {
     ($name:ident, $radix_key_type:ty, $offset_type:ty) => {
         #[inline(never)] // Don't inline, the offset array needs a lot of stack
         fn $name<T, F>(input: &mut [T], mut key_fn: F, unopt: bool)
-            where F: FnMut(&T) -> $radix_key_type
+        where
+            F: FnMut(&T) -> $radix_key_type,
         {
             // This implementation is radix 256, so the size of a digit is 8 bits / one byte.
             // You can experiment with different digit sizes by changing this constant, but
@@ -66,15 +68,14 @@ macro_rules! sort_impl {
             const DIGIT_BITS: usize = 8;
 
             const RADIX_KEY_BITS: usize = mem::size_of::<$radix_key_type>() * 8;
-            
+
             // Have one bucket for each possible value of the digit
             const BUCKET_COUNT: usize = 1 << DIGIT_BITS;
 
             const DIGIT_COUNT: usize = (RADIX_KEY_BITS + DIGIT_BITS - 1) / DIGIT_BITS;
-            
+
             let digit_skip_enabled: bool = !unopt;
-            
-            
+
             /// Extracts the digit from the key, starting with the least significant digit.
             /// The digit is used as a bucket index.
             #[inline(always)]
@@ -82,13 +83,13 @@ macro_rules! sort_impl {
                 const DIGIT_MASK: $radix_key_type = ((1 << DIGIT_BITS) - 1) as $radix_key_type;
                 ((key >> (digit * DIGIT_BITS)) & DIGIT_MASK) as usize
             }
-            
 
             // In the worst case (`u128` key, `input.len() >= u32::MAX`) uses 32 KiB on the stack.
             let mut offsets = [[0 as $offset_type; BUCKET_COUNT]; DIGIT_COUNT];
             let mut skip_digit = [false; DIGIT_COUNT];
 
-            {   // Calculate bucket offsets for each digit.
+            {
+                // Calculate bucket offsets for each digit.
 
                 // Calculate histograms/bucket sizes and store in `offsets`.
                 for t in input.iter() {
@@ -97,7 +98,7 @@ macro_rules! sort_impl {
                         offsets[digit][extract_digit(key, digit)] += 1;
                     }
                 }
-                
+
                 if digit_skip_enabled {
                     // For each digit, check if all the elements are in the same bucket.
                     // If so, we can skip the whole digit. Instead of checking all the buckets,
@@ -109,7 +110,7 @@ macro_rules! sort_impl {
                         skip_digit[digit] = skip;
                     }
                 }
-                
+
                 // Turn the histogram/bucket sizes into bucket offsets by calculating a prefix sum.
                 // Sizes:     |---b1---|-b2-|---b3---|----b4----|
                 // Offsets:   0        b1   b1+b2    b1+b2+b3
@@ -126,7 +127,7 @@ macro_rules! sort_impl {
 
                 // The `offsets` array now contains bucket offsets for each digit.
             }
-            
+
             let len = input.len();
 
             // Drop impl of DoubleBuffer ensures that `input` is consistent,
@@ -138,7 +139,6 @@ macro_rules! sort_impl {
             // digit, our elements are sorted.
             for digit in 0..DIGIT_COUNT {
                 if !(digit_skip_enabled && skip_digit[digit]) {
-
                     // Copy the offsets. We need the original later for a consistency check.
                     // As we write elements into each bucket, we increment the bucket offset
                     // so that it points to the next empty slot.
@@ -149,12 +149,12 @@ macro_rules! sort_impl {
                             // This is safe, r_pos is in (0..len)
                             buffer.read(r_pos)
                         };
-                        
+
                         let key = key_fn(t);
                         let bucket = extract_digit(key, digit);
 
                         let offset = &mut working_offsets[bucket];
-                        
+
                         unsafe {
                             // Make sure the offset is in bounds. An unreliable key function, which
                             // returns different keys for the same element when called repeatedly,
@@ -183,10 +183,10 @@ macro_rules! sort_impl {
                         // If the bucket is full, the working offset is now equal to the original
                         // offset of the next bucket. The working offset of the last bucket should
                         // be equal to the number of elements.
-                        let bucket_sizes_match =
-                            working_offsets[0..BUCKET_COUNT-1] == offsets[digit][1..BUCKET_COUNT] &&
-                            working_offsets[BUCKET_COUNT-1] == len as $offset_type;
-                            
+                        let bucket_sizes_match = working_offsets[0..BUCKET_COUNT - 1]
+                            == offsets[digit][1..BUCKET_COUNT]
+                            && working_offsets[BUCKET_COUNT - 1] == len as $offset_type;
+
                         if !bucket_sizes_match {
                             // The bucket sizes do not match expected sizes, the key function is
                             // unreliable (programming mistake).
@@ -195,8 +195,10 @@ macro_rules! sort_impl {
                             // consistent. This would happen automatically, but I'm making it
                             // explicit for clarity.
                             drop(buffer);
-                            panic!("The key function is not reliable: when called repeatedly, \
-                                it returned different keys for the same element.")
+                            panic!(
+                                "The key function is not reliable: when called repeatedly, \
+                                it returned different keys for the same element."
+                            )
                         }
                     }
 
@@ -212,13 +214,13 @@ macro_rules! sort_impl {
             // clarity.
             drop(buffer);
         }
-    }
+    };
 }
 
 macro_rules! radix_key_impl {
     ($($key_type:ty)*) => ($(
         impl RadixKey for $key_type {
-            
+
             #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
             sort_impl!(radix_sort_u32, $key_type, u32);
 
@@ -227,23 +229,22 @@ macro_rules! radix_key_impl {
     )*)
 }
 
-radix_key_impl!{ u8 u16 u32 u64 u128 }
-
+radix_key_impl! { u8 u16 u32 u64 u128 }
 
 /// Double buffer. Allocates a temporary memory the size of the slice, so that
 /// elements can be freely reordered from buffer to buffer.
-/// 
+///
 /// # Consistency
-/// 
+///
 /// For the purposes of this struct, buffer in a consistent state contains a
 /// permutation of elements from the original slice. In other words, elements
 /// can be reordered, but not duplicated or lost.
-/// 
+///
 /// `read_buf` is always consistent. Before calling `swap`, the caller must
 /// ensure that `write_buf` is also consistent.
-/// 
+///
 /// # Drop behavior
-/// 
+///
 /// Drop impl ensures that the slice this buffer was constructed with is left in
 /// a consistent state. If the input slice ended up as `write_buf`, the
 /// temporary memory (which is now `read_buf` and therefore consistent) is
@@ -262,7 +263,6 @@ struct DoubleBuffer<'a, T> {
 }
 
 impl<'a, T> DoubleBuffer<'a, T> {
-
     fn new(slice: &'a mut [T]) -> DoubleBuffer<'a, T> {
         let mut aux = Vec::with_capacity(slice.len());
         let read_buf = slice.as_ptr();
@@ -277,17 +277,17 @@ impl<'a, T> DoubleBuffer<'a, T> {
             write_buf,
         }
     }
-    
-    /// Returns a ref to an element from the read buffer. 
-    /// 
+
+    /// Returns a ref to an element from the read buffer.
+    ///
     /// Caller must ensure that `index` is in (0..len).
     #[inline(always)]
     unsafe fn read(&self, index: usize) -> &T {
         &*self.read_buf.add(index)
     }
-    
+
     /// Copies the referenced element into the write buffer.
-    /// 
+    ///
     /// Caller must ensure that `index` is in (0..len).
     #[inline(always)]
     unsafe fn write(&self, index: usize, t: &T) {
@@ -297,7 +297,7 @@ impl<'a, T> DoubleBuffer<'a, T> {
     }
 
     /// Swaps the read and write buffers.
-    /// 
+    ///
     /// Caller must ensure that the write buffer is consistent before calling
     /// this function.
     unsafe fn swap(&mut self) {
@@ -318,7 +318,8 @@ impl<'a, T> Drop for DoubleBuffer<'a, T> {
             // Input slice is the write buffer, copy the consistent state from the read buffer
             unsafe {
                 // This is safe, `read_buf` is always consistent and the length is the same.
-                self.write_buf.copy_from_nonoverlapping(self.read_buf, self.slice.len());
+                self.write_buf
+                    .copy_from_nonoverlapping(self.read_buf, self.slice.len());
                 self.swap();
             }
         }
