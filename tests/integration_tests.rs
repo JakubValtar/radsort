@@ -21,7 +21,7 @@ fn sort_char() {
         '\u{10000}', '\u{10001}', '\u{FFFFF}', '\u{10FFFF}' // 4-byte sequence
     ];
     actual.reverse();
-    let mut expected = actual.clone();
+    let mut expected = actual;
     radsort::sort(&mut actual);
     expected.sort();
     assert_eq!(actual, expected);
@@ -111,7 +111,7 @@ fn sort_struct() {
     {
         // Sorting actual values
         let mut actual = source.clone();
-        let mut expected = source.clone();
+        let mut expected = source;
         radsort::sort_by_key(&mut actual, |d| d.0);
         expected.sort_by_key(|d| d.0);
         assert_eq!(actual, expected);
@@ -163,7 +163,7 @@ fn sort_compound() {
 #[test]
 fn sort_zst() {
     let mut actual = [(); 10];
-    let mut expected = actual.clone();
+    let mut expected = actual;
     expected.sort();
     radsort::sort_by_key(&mut actual, |_| 0);
     assert_eq!(actual, expected);

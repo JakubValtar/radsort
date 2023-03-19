@@ -215,7 +215,7 @@ mod tests {
             '\u{800}',   '\u{801}',   '\u{FFF}',   '\u{FFFF}',  // 3-byte sequence
             '\u{10000}', '\u{10001}', '\u{FFFFF}', '\u{10FFFF}' // 4-byte sequence
         ];
-        let expected = actual.clone();
+        let expected = actual;
         actual.reverse();
         actual.sort_by_key(|v| v.to_radix_key());
         assert_eq!(actual, expected);
@@ -232,7 +232,7 @@ mod tests {
                     core::$t::MAX >> (mem::size_of::<$t>() * 8 / 2),
                     (-1i8) as $t, 0, 1,
                 ];
-                let mut expected = actual.clone();
+                let mut expected = actual;
                 expected.sort();
                 actual.sort_by_key(|v| v.to_radix_key());
                 assert_eq!(actual, expected);
@@ -249,6 +249,7 @@ mod tests {
     fn test_key_float() {
         {
             // F32
+            #[allow(clippy::unusual_byte_groupings)]
             let mut actual = [
                 f32::from_bits(0b1_11111111_11111111111111111111111), // negative NaN
                 f32::from_bits(0b1_11111111_00000000000000000000001), // negative NaN
@@ -281,6 +282,7 @@ mod tests {
         {
             // F64
             #[rustfmt::skip]
+            #[allow(clippy::unusual_byte_groupings)]
             let mut actual = [
                 f64::from_bits(0b1_11111111111_1111111111111111111111111111111111111111111111111111), // negative NaN
                 f64::from_bits(0b1_11111111111_0000000000000000000000000000000000000000000000000001), // negative NaN
