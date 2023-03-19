@@ -7,9 +7,9 @@
 //! of supported keys.
 //!
 //! - best and worst-case running time is `O(n)` – see [benchmarks] for more
-//! detailed performance characteristics
+//!   detailed performance characteristics
 //! - space complexity is `O(n)` – direct sort allocates temporary storage the
-//! size of the slice, for indirect see [`sort_by_cached_key`]
+//!   size of the slice, for indirect see [`sort_by_cached_key`]
 //! - stable, i.e. does not reorder equal elements
 //! - uses `#![no_std]`, but needs an allocator
 //!
@@ -88,7 +88,6 @@
 //! [`sort_by_cached_key`]: ./fn.sort_by_cached_key.html
 //! [`PartialOrd`]: https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html
 
-#![warn(clippy::all)]
 #![no_std]
 
 extern crate alloc;
@@ -305,13 +304,13 @@ where
     let sz_u32 = core::mem::size_of::<(K, u32)>();
     let sz_usize = core::mem::size_of::<(K, usize)>();
 
-    if sz_u8 < sz_u16 && len <= (core::u8::MAX as usize + 1) {
+    if sz_u8 < sz_u16 && len <= (u8::MAX as usize + 1) {
         return radsort_by_cached_key!(u8);
     }
-    if sz_u16 < sz_u32 && len <= (core::u16::MAX as usize + 1) {
+    if sz_u16 < sz_u32 && len <= (u16::MAX as usize + 1) {
         return radsort_by_cached_key!(u16);
     }
-    if sz_u32 < sz_usize && len <= (core::u32::MAX as usize + 1) {
+    if sz_u32 < sz_usize && len <= (u32::MAX as usize + 1) {
         return radsort_by_cached_key!(u32);
     }
 

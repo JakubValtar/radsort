@@ -1,5 +1,3 @@
-#![warn(clippy::all)]
-
 #[test]
 fn sort_bool() {
     let mut actual = [
@@ -21,7 +19,7 @@ fn sort_char() {
         '\u{10000}', '\u{10001}', '\u{FFFFF}', '\u{10FFFF}' // 4-byte sequence
     ];
     actual.reverse();
-    let mut expected = actual.clone();
+    let mut expected = actual;
     radsort::sort(&mut actual);
     expected.sort();
     assert_eq!(actual, expected);
@@ -33,8 +31,8 @@ fn sort_integer() {
     macro_rules! implement {
         ($($t:ident)*) => ($(
             let mut actual = [
-                std::$t::MIN, std::$t::MIN+1, std::$t::MIN / 2,
-                std::$t::MAX, std::$t::MAX-1, std::$t::MAX / 2,
+                $t::MIN, $t::MIN+1, $t::MIN / 2,
+                $t::MAX, $t::MAX-1, $t::MAX / 2,
                 -1i8 as $t, 0, 1,
             ];
             let mut expected = actual.clone();
@@ -55,10 +53,10 @@ fn sort_float() {
         ($($t:ident)*) => ($(
             let mut actual = [
                 0.0, -0.0, 1.0, -1.0,
-                std::$t::MIN, std::$t::MAX,
-                std::$t::MIN_POSITIVE, -std::$t::MIN_POSITIVE,
-                std::$t::EPSILON, -std::$t::EPSILON,
-                std::$t::INFINITY, std::$t::NEG_INFINITY,
+                $t::MIN, $t::MAX,
+                $t::MIN_POSITIVE, -$t::MIN_POSITIVE,
+                $t::EPSILON, -$t::EPSILON,
+                $t::INFINITY, $t::NEG_INFINITY,
             ];
             let mut expected = actual.clone();
             expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -75,8 +73,8 @@ fn sort_cached() {
     macro_rules! implement {
         ($($t:ident)*) => ($(
             let mut actual = [
-                std::$t::MIN, std::$t::MIN+1, std::$t::MIN / 2,
-                std::$t::MAX, std::$t::MAX-1, std::$t::MAX / 2,
+                $t::MIN, $t::MIN+1, $t::MIN / 2,
+                $t::MAX, $t::MAX-1, $t::MAX / 2,
                 -1i8 as $t, 0, 1,
             ];
             let mut expected = actual.clone();
@@ -99,19 +97,17 @@ fn sort_struct() {
 
     {
         // Sorting references
-        let source_copy = source.clone();
         let mut actual: Vec<&Data> = source.iter().collect();
         let mut expected = actual.clone();
         radsort::sort_by_key(&mut actual, |d| d.0);
         expected.sort_by_key(|d| d.0);
         assert_eq!(actual, expected);
-        assert_eq!(source, source_copy);
     }
 
     {
         // Sorting actual values
         let mut actual = source.clone();
-        let mut expected = source.clone();
+        let mut expected = source;
         radsort::sort_by_key(&mut actual, |d| d.0);
         expected.sort_by_key(|d| d.0);
         assert_eq!(actual, expected);
@@ -163,7 +159,7 @@ fn sort_compound() {
 #[test]
 fn sort_zst() {
     let mut actual = [(); 10];
-    let mut expected = actual.clone();
+    let mut expected = actual;
     expected.sort();
     radsort::sort_by_key(&mut actual, |_| 0);
     assert_eq!(actual, expected);

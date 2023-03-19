@@ -29,9 +29,9 @@ pub trait RadixKey: Key {
             return;
         }
 
-        #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
+        #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
         {
-            if len <= core::u32::MAX as usize {
+            if len <= u32::MAX as usize {
                 Self::radix_sort_u32(slice, |t| key_fn(t), unopt);
                 return;
             }
@@ -43,7 +43,7 @@ pub trait RadixKey: Key {
     /// Sorting for slices with up to `u32::MAX` elements, which is a majority
     /// of cases. Uses `u32` indices for histograms and offsets to save cache
     /// space.
-    #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
+    #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
     fn radix_sort_u32<T, F>(slice: &mut [T], key_fn: F, unopt: bool)
     where
         F: FnMut(&T) -> Self;
@@ -221,7 +221,7 @@ macro_rules! radix_key_impl {
     ($($key_type:ty)*) => ($(
         impl RadixKey for $key_type {
 
-            #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
+            #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
             sort_impl!(radix_sort_u32, $key_type, u32);
 
             sort_impl!(radix_sort_usize, $key_type, usize);

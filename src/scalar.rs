@@ -40,9 +40,6 @@ key_impl_unsigned!(usize => u32);
 #[cfg(target_pointer_width = "64")]
 key_impl_unsigned!(usize => u64);
 
-#[cfg(target_pointer_width = "128")]
-key_impl_unsigned!(usize => u128);
-
 key_impl_unsigned!(bool => u8);
 key_impl_unsigned!(char => u32);
 
@@ -93,9 +90,6 @@ key_impl_signed!(isize => u32);
 
 #[cfg(target_pointer_width = "64")]
 key_impl_signed!(isize => u64);
-
-#[cfg(target_pointer_width = "128")]
-key_impl_signed!(isize => u128);
 
 /// Implements `Scalar` for a floating-point number type(s).
 ///
@@ -215,7 +209,7 @@ mod tests {
             '\u{800}',   '\u{801}',   '\u{FFF}',   '\u{FFFF}',  // 3-byte sequence
             '\u{10000}', '\u{10001}', '\u{FFFFF}', '\u{10FFFF}' // 4-byte sequence
         ];
-        let expected = actual.clone();
+        let expected = actual;
         actual.reverse();
         actual.sort_by_key(|v| v.to_radix_key());
         assert_eq!(actual, expected);
@@ -226,13 +220,13 @@ mod tests {
         macro_rules! implement {
             ($($t:ident)*) => ($(
                 let mut actual = [
-                    core::$t::MIN, core::$t::MIN+1, core::$t::MIN / 2,
-                    core::$t::MIN >> (mem::size_of::<$t>() * 8 / 2),
-                    core::$t::MAX, core::$t::MAX-1, core::$t::MAX / 2,
-                    core::$t::MAX >> (mem::size_of::<$t>() * 8 / 2),
+                    $t::MIN, $t::MIN+1, $t::MIN / 2,
+                    $t::MIN >> (mem::size_of::<$t>() * 8 / 2),
+                    $t::MAX, $t::MAX-1, $t::MAX / 2,
+                    $t::MAX >> (mem::size_of::<$t>() * 8 / 2),
                     (-1i8) as $t, 0, 1,
                 ];
-                let mut expected = actual.clone();
+                let mut expected = actual;
                 expected.sort();
                 actual.sort_by_key(|v| v.to_radix_key());
                 assert_eq!(actual, expected);
@@ -249,6 +243,7 @@ mod tests {
     fn test_key_float() {
         {
             // F32
+            #[allow(clippy::unusual_byte_groupings)]
             let mut actual = [
                 f32::from_bits(0b1_11111111_11111111111111111111111), // negative NaN
                 f32::from_bits(0b1_11111111_00000000000000000000001), // negative NaN
@@ -281,6 +276,7 @@ mod tests {
         {
             // F64
             #[rustfmt::skip]
+            #[allow(clippy::unusual_byte_groupings)]
             let mut actual = [
                 f64::from_bits(0b1_11111111111_1111111111111111111111111111111111111111111111111111), // negative NaN
                 f64::from_bits(0b1_11111111111_0000000000000000000000000000000000000000000000000001), // negative NaN
