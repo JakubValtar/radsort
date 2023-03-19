@@ -13,3 +13,15 @@ keywords = ["sorting", "sort", "radix", "counting"]
 readme = "README.md"
 
 [dependencies]
+
+[dev-dependencies]
+criterion = "0.4"
+fastrand = "1.9"
+radsort-latest = { package = "radsort", version = "*" }
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benchmark"
+harness = false
