@@ -24,8 +24,8 @@ fn regression(c: &mut Criterion) {
     bench_type(c, |_| fastrand::i64(..));
     bench_type(c, |_| fastrand::i128(..));
 
-    bench_type(c, |_| fastrand::f32());
-    bench_type(c, |_| fastrand::f64());
+    bench_f32(c, |_| fastrand::f32());
+    bench_f64(c, |_| fastrand::f64());
 
     bench_type(c, |_| fastrand::bool());
     bench_type(c, |_| fastrand::char('\u{0}'..'\u{10FFFF}'));
@@ -33,15 +33,68 @@ fn regression(c: &mut Criterion) {
 
 fn bench_type<T>(c: &mut Criterion, gen: fn(usize) -> T)
 where
-    T: Clone + radsort::Key + radsort_latest::Key,
+    T: Clone + Ord + radsort::Key + radsort_latest::Key + radsort_main::Key,
 {
     let gen = |size| {
         fastrand::seed(0);
         (0..size).map(gen).collect()
     };
 
-    bench_function(c, gen, "latest", radsort_latest::sort);
     bench_function(c, gen, "head", radsort::sort);
+    bench_function(c, gen, "main", radsort_main::sort);
+    bench_function(c, gen, "latest", radsort_latest::sort);
+    bench_function(c, gen, "std stable", std_stable);
+    bench_function(c, gen, "std unstable", std_unstable);
+}
+
+fn bench_f32(c: &mut Criterion, gen: fn(usize) -> f32) {
+    let gen = |size| {
+        fastrand::seed(0);
+        (0..size).map(gen).collect()
+    };
+
+    bench_function(c, gen, "head", radsort::sort);
+    bench_function(c, gen, "main", radsort_main::sort);
+    bench_function(c, gen, "latest", radsort_latest::sort);
+    bench_function(c, gen, "std stable", std_stable_f32);
+    bench_function(c, gen, "std unstable", std_unstable_f32);
+}
+
+fn bench_f64(c: &mut Criterion, gen: fn(usize) -> f64) {
+    let gen = |size| {
+        fastrand::seed(0);
+        (0..size).map(gen).collect()
+    };
+
+    bench_function(c, gen, "head", radsort::sort);
+    bench_function(c, gen, "main", radsort_main::sort);
+    bench_function(c, gen, "latest", radsort_latest::sort);
+    bench_function(c, gen, "std stable", std_stable_f64);
+    bench_function(c, gen, "std unstable", std_unstable_f64);
+}
+
+fn std_stable<T: Ord>(slice: &mut [T]) {
+    slice.sort();
+}
+
+fn std_stable_f32(slice: &mut [f32]) {
+    slice.sort_by(|a, b| a.total_cmp(b));
+}
+
+fn std_stable_f64(slice: &mut [f64]) {
+    slice.sort_by(|a, b| a.total_cmp(b));
+}
+
+fn std_unstable<T: Ord>(slice: &mut [T]) {
+    slice.sort_unstable();
+}
+
+fn std_unstable_f32(slice: &mut [f32]) {
+    slice.sort_unstable_by(|a, b| a.total_cmp(b));
+}
+
+fn std_unstable_f64(slice: &mut [f64]) {
+    slice.sort_unstable_by(|a, b| a.total_cmp(b));
 }
 
 fn bench_function<T: Clone>(
@@ -52,8 +105,8 @@ fn bench_function<T: Clone>(
 ) {
     let mut group = c.benchmark_group(name);
     let t_name = std::any::type_name::<T>();
-    for size in 1..=3 {
-        let elems = 100_u64.pow(size);
+    for size in 0..=4 {
+        let elems = 25 * 10_u64.pow(size);
         group.throughput(Throughput::Elements(elems));
         group.bench_with_input(BenchmarkId::new(t_name, elems), &elems, |b, &elems| {
             let input = gen(elems as usize);
@@ -62,7 +115,7 @@ fn bench_function<T: Clone>(
                 |data| {
                     sort(data);
                 },
-                criterion::BatchSize::SmallInput,
+                criterion::BatchSize::LargeInput,
             );
         });
     }

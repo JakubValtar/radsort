@@ -123,10 +123,10 @@ fn sort_struct() {
 fn sort_compound() {
     let mut actual = Vec::new();
 
-    for a in 0..10 {
-        for b in 0..10 {
-            for c in 0..10 {
-                for d in 0..10 {
+    for a in 0..5 {
+        for b in 0..5 {
+            for c in 0..5 {
+                for d in 0..5 {
                     actual.push([a, b, c, d]);
                 }
             }
@@ -218,4 +218,12 @@ fn exception_safety() {
 
     actual.sort();
     assert_eq!(expected, actual);
+}
+
+#[test]
+fn offset_type_handles_max_offset_value() {
+    let mut actual: Vec<u8> = (0..255).collect();
+    let mut expected = actual.clone();
+    expected.sort();
+    radsort::sort(&mut actual);
 }

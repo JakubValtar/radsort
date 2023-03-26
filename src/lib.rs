@@ -96,11 +96,10 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 mod double_buffer;
-mod scalar;
+mod radix_key;
 mod sort;
 
-use scalar::Scalar;
-use sort::RadixKey;
+use crate::radix_key::RadixKey;
 
 /// Sorts the slice.
 ///
@@ -120,8 +119,11 @@ use sort::RadixKey;
 /// assert_eq!(data, [-42, -1, 3, 5, 15]);
 /// ```
 /// [`Key`]: trait.Key.html
-#[inline]
 pub fn sort<T: Key>(slice: &mut [T]) {
+    Key::sort_by_key(slice, |v| *v, false);
+}
+
+pub fn sort_u64(slice: &mut [u64]) {
     Key::sort_by_key(slice, |v| *v, false);
 }
 
@@ -156,7 +158,6 @@ pub fn sort<T: Key>(slice: &mut [T]) {
 ///
 /// [`Key`]: trait.Key.html
 /// [`sort_by_cached_key`]: fn.sort_by_cached_key.html
-#[inline]
 pub fn sort_by_key<T, F, K>(slice: &mut [T], mut key_fn: F)
 where
     F: FnMut(&T) -> K,
@@ -197,7 +198,6 @@ where
 ///
 /// [`Key`]: ./trait.Key.html
 /// [`sort_by_key`]: fn.sort_by_key.html
-#[inline]
 pub fn sort_by_cached_key<T, F, K>(slice: &mut [T], key_fn: F)
 where
     F: FnMut(&T) -> K,
@@ -232,7 +232,6 @@ pub mod unopt {
     /// Version of [`sort`](../fn.sort.html) which does not skip digits (bytes).
     ///
     /// See the [module documentation](./index.html) for more details.
-    #[inline]
     pub fn sort<T: Key>(slice: &mut [T]) {
         Key::sort_by_key(slice, |v| *v, true);
     }
@@ -240,7 +239,6 @@ pub mod unopt {
     /// Version of [`sort_by_key`](../fn.sort_by_key.html) which does not skip digits (bytes).
     ///
     /// See the [module documentation](./index.html) for more details.
-    #[inline]
     pub fn sort_by_key<T, F, K>(slice: &mut [T], mut key_fn: F)
     where
         F: FnMut(&T) -> K,
@@ -252,7 +250,6 @@ pub mod unopt {
     /// Version of [`sort_by_cached_key`](../fn.sort_by_cached_key.html) which does not skip digits (bytes).
     ///
     /// See the [module documentation](./index.html) for more details.
-    #[inline]
     pub fn sort_by_cached_key<T, F, K>(slice: &mut [T], key_fn: F)
     where
         F: FnMut(&T) -> K,
@@ -262,7 +259,6 @@ pub mod unopt {
     }
 }
 
-#[inline]
 fn sort_by_cached_key_internal<T, F, K>(slice: &mut [T], mut key_fn: F, unopt: bool)
 where
     F: FnMut(&T) -> K,
@@ -296,27 +292,31 @@ where
         }};
     }
 
-    let len = slice.len();
-    if len < 2 {
-        return;
+    match slice.len() {
+        len if len < 2 => (),
+        len if len <= core::u8::MAX as usize + 1 => {
+            radsort_by_cached_key!(u8);
+        }
+        #[cfg(not(target_pointer_width = "16"))]
+        len if len <= core::u16::MAX as usize + 1 => {
+            radsort_by_cached_key!(u16);
+        }
+        #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
+        len if len <= core::u32::MAX as usize + 1 => {
+            radsort_by_cached_key!(u32);
+        }
+        #[cfg(not(any(
+            target_pointer_width = "16",
+            target_pointer_width = "32",
+            target_pointer_width = "64"
+        )))]
+        len if len <= core::u64::MAX as usize + 1 => {
+            radsort_by_cached_key!(u64);
+        }
+        _ => {
+            radsort_by_cached_key!(usize);
+        }
     }
-
-    let sz_u8 = core::mem::size_of::<(K, u8)>();
-    let sz_u16 = core::mem::size_of::<(K, u16)>();
-    let sz_u32 = core::mem::size_of::<(K, u32)>();
-    let sz_usize = core::mem::size_of::<(K, usize)>();
-
-    if sz_u8 < sz_u16 && len <= (core::u8::MAX as usize + 1) {
-        return radsort_by_cached_key!(u8);
-    }
-    if sz_u16 < sz_u32 && len <= (core::u16::MAX as usize + 1) {
-        return radsort_by_cached_key!(u16);
-    }
-    if sz_u32 < sz_usize && len <= (core::u32::MAX as usize + 1) {
-        return radsort_by_cached_key!(u32);
-    }
-
-    radsort_by_cached_key!(usize)
 }
 
 /// Types which can be used as sorting keys.
@@ -346,11 +346,10 @@ pub trait Key: Copy + private::Sealed {
 macro_rules! impl_for_scalar { ($($t:ty)*) => ($(
     impl Key for $t {
         #[doc(hidden)]
-        #[inline]
         fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
             where F: FnMut(&T) -> Self
         {
-            RadixKey::radix_sort(slice, |t| key_fn(t).to_radix_key(), unopt);
+            sort::dispatch_sort(slice, |t| RadixKey::from(key_fn(t)), unopt);
         }
     }
 )*) }
@@ -364,7 +363,6 @@ impl_for_scalar! {
 
 impl<A: Key> Key for (A,) {
     #[doc(hidden)]
-    #[inline]
     fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
     where
         F: FnMut(&T) -> Self,
@@ -375,7 +373,6 @@ impl<A: Key> Key for (A,) {
 
 impl<A: Key, B: Key> Key for (A, B) {
     #[doc(hidden)]
-    #[inline]
     fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
     where
         F: FnMut(&T) -> Self,
@@ -387,7 +384,6 @@ impl<A: Key, B: Key> Key for (A, B) {
 
 impl<A: Key, B: Key, C: Key> Key for (A, B, C) {
     #[doc(hidden)]
-    #[inline]
     fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
     where
         F: FnMut(&T) -> Self,
@@ -400,7 +396,6 @@ impl<A: Key, B: Key, C: Key> Key for (A, B, C) {
 
 impl<A: Key, B: Key, C: Key, D: Key> Key for (A, B, C, D) {
     #[doc(hidden)]
-    #[inline]
     fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
     where
         F: FnMut(&T) -> Self,

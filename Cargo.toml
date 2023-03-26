@@ -2,7 +2,7 @@
 name = "radsort"
 description = "Radix sort implementation for sorting by scalar keys (integers, floats, chars, bools)"
 repository = "https://github.com/jakubvaltar/radsort"
-version = "0.1.0"
+version = "0.1.1-alpha"
 authors = ["Jakub Valtar <jakub.valtar@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -18,7 +18,8 @@ readme = "README.md"
 [dev-dependencies]
 criterion = "0.4"
 fastrand = "1.9"
-radsort-latest = { package = "radsort", version = "*" }
+radsort-latest = { package = "radsort", version = "=0.1.0" }
+radsort-main = { package = "radsort", git = "https://github.com/JakubValtar/radsort", branch = "main" }
 
 [lib]
 bench = false

@@ -2,51 +2,123 @@
 
 use core::mem;
 
-use crate::sort::RadixKey;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RadixKey<const W: usize>([u8; W]);
 
-/// Scalar types which can be converted to radix sorting keys.
-pub trait Scalar: Copy + private::Sealed {
-    type ToRadixKey: RadixKey;
+impl<const W: usize> RadixKey<W> {
+    // The key is a byte array, we can access any byte (digit) using an index.
+    //
+    // Here's why that's slow:
+    //
+    // If the compiler did at least a half-decent job, the key will be already
+    // in a register. There are instructions to access the lowest byte, but to
+    // go any higher, the key needs to be stored in memory and the byte has to
+    // be loaded from there.
+    //
+    // The alternative is to right shift the desired byte into the lowest byte
+    // of the register and read it from there. A quick benchmark reported up to
+    // 20% improvement for the whole sort.
 
-    /// Maps the value to a radix sorting key, preserving the sorting order.
-    fn to_radix_key(self) -> Self::ToRadixKey;
+    #[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
+    #[inline(always)]
+    pub fn bucket(&self, mut digit: usize) -> usize {
+        self.0[digit] as usize
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[inline(always)]
+    pub fn bucket(&self, mut digit: usize) -> usize {
+        let mut key = [0u8; 4];
+        if W == 1 {
+            return self.0[0] as usize;
+        } else if W <= 4 {
+            key[..W].copy_from_slice(&self.0);
+        } else if W == 8 {
+            if digit < 4 {
+                key.copy_from_slice(&self.0[0..4]);
+            } else {
+                key.copy_from_slice(&self.0[4..8]);
+                digit -= 4;
+            }
+        } else if W == 16 {
+            if digit < 4 {
+                key.copy_from_slice(&self.0[0..4]);
+            } else if digit < 8 {
+                key.copy_from_slice(&self.0[4..8]);
+                digit -= 4;
+            } else if digit < 12 {
+                key.copy_from_slice(&self.0[8..12]);
+                digit -= 8;
+            } else {
+                key.copy_from_slice(&self.0[12..16]);
+                digit -= 12;
+            }
+        } else {
+            return self.0[digit] as usize;
+        }
+        ((u64::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[inline(always)]
+    pub fn bucket(&self, mut digit: usize) -> usize {
+        let mut key = [0u8; 8];
+        if W == 1 {
+            return self.0[0] as usize;
+        } else if W <= 8 {
+            key[..W].copy_from_slice(&self.0);
+        } else if W == 16 {
+            if digit < 8 {
+                key.copy_from_slice(&self.0[0..8]);
+            } else {
+                key.copy_from_slice(&self.0[8..16]);
+                digit -= 8;
+            }
+        } else {
+            return self.0[digit] as usize;
+        }
+        ((u64::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
+    }
 }
 
-/// Implements `Scalar` for an unsigned integer type(s).
-///
-/// Since we use unsigned integers as radix sorting keys, we directly return the
-/// value.
+#[cfg(test)]
+impl<const W: usize> PartialOrd for RadixKey<W> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+impl<const W: usize> Ord for RadixKey<W> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        core::iter::zip(self.0, other.0)
+            // Compare each byte
+            .map(|(a, b)| a.cmp(&b))
+            // The most significant bytes are at the back
+            .rfind(|&o| o != core::cmp::Ordering::Equal)
+            .unwrap_or(core::cmp::Ordering::Equal)
+    }
+}
+
+/// Implements `From` for unsigned integer types.
 macro_rules! key_impl_unsigned {
-    ($($t:ty)*) => ($( key_impl_unsigned!($t => $t); )*);
-    ($t:ty => $radix_key:ty) => (
-        impl Scalar for $t {
-            type ToRadixKey = $radix_key;
+    ($($t:ty)*) => ($( key_impl_unsigned!($t as $t); )*);
+    ($t:ty as $t2:ty) => (
+        impl From<$t> for RadixKey<{core::mem::size_of::<$t>()}> {
             #[inline(always)]
-            fn to_radix_key(self) -> Self::ToRadixKey {
-                self as $radix_key
+            fn from(v: $t) -> Self {
+                Self((v as $t2).to_le_bytes())
             }
         }
-    )
+    );
 }
 
-key_impl_unsigned! { u8 u16 u32 u64 u128 }
+key_impl_unsigned! { u8 u16 u32 u64 u128 usize }
 
-#[cfg(target_pointer_width = "16")]
-key_impl_unsigned!(usize => u16);
+key_impl_unsigned!(bool as u8);
+key_impl_unsigned!(char as u32);
 
-#[cfg(target_pointer_width = "32")]
-key_impl_unsigned!(usize => u32);
-
-#[cfg(target_pointer_width = "64")]
-key_impl_unsigned!(usize => u64);
-
-#[cfg(target_pointer_width = "128")]
-key_impl_unsigned!(usize => u128);
-
-key_impl_unsigned!(bool => u8);
-key_impl_unsigned!(char => u32);
-
-/// Implements `Scalar` for a signed integer type(s).
+/// Implements `From` for signed integer types.
 ///
 /// Signed integers are mapped to unsigned integers of the same width.
 ///
@@ -64,40 +136,21 @@ key_impl_unsigned!(char => u32);
 ///  128: 0111_1111    1111_1111
 /// ```
 macro_rules! key_impl_signed {
-    ($($t:ty => $radix_key:ty),*) => ($(
-        impl Scalar for $t {
-            type ToRadixKey = $radix_key;
+    ($($t:ty)*) => ($(
+        impl From<$t> for RadixKey<{core::mem::size_of::<$t>()}> {
             #[inline(always)]
-            fn to_radix_key(self) -> Self::ToRadixKey {
+            fn from(v: $t) -> Self {
                 const BIT_COUNT: usize = 8 * mem::size_of::<$t>();
-                const SIGN_BIT: $radix_key = 1 << (BIT_COUNT-1);
-                (self as $radix_key) ^ SIGN_BIT
+                const SIGN_BIT: $t = 1 << (BIT_COUNT-1);
+                Self((v ^ SIGN_BIT).to_le_bytes())
             }
         }
     )*)
 }
 
-key_impl_signed! {
-    i8 => u8,
-    i16 => u16,
-    i32 => u32,
-    i64 => u64,
-    i128 => u128
-}
+key_impl_signed! { i8 i16 i32 i64 i128 isize }
 
-#[cfg(target_pointer_width = "16")]
-key_impl_signed!(isize => u16);
-
-#[cfg(target_pointer_width = "32")]
-key_impl_signed!(isize => u32);
-
-#[cfg(target_pointer_width = "64")]
-key_impl_signed!(isize => u64);
-
-#[cfg(target_pointer_width = "128")]
-key_impl_signed!(isize => u128);
-
-/// Implements `Scalar` for a floating-point number type(s).
+/// Implements `From` for floating-point number types.
 ///
 /// Floating-point numbers are mapped to unsigned integers of the same width.
 ///
@@ -153,45 +206,26 @@ key_impl_signed!(isize => u128);
 macro_rules! key_impl_float {
 
     // signed_key type is needed for arithmetic right shift
-    ($($t:ty => $radix_key:ty : $signed_key:ty),*) => ($(
-        impl Scalar for $t {
-            type ToRadixKey = $radix_key;
+    ($($t:ty as $signed_key:ty),*) => ($(
+        impl From<$t> for RadixKey<{core::mem::size_of::<$t>()}> {
             #[inline(always)]
-            fn to_radix_key(self) -> Self::ToRadixKey {
+            fn from(v: $t) -> Self {
                 const BIT_COUNT: usize = 8 * mem::size_of::<$t>();
                 // all floats need to have the sign bit flipped
-                const FLIP_SIGN_MASK: $radix_key = 1 << (BIT_COUNT-1); // 0x800...
+                const FLIP_SIGN_MASK: $signed_key = 1 << (BIT_COUNT-1); // 0x800...
 
-                let bits = self.to_bits();
+                let bits = v.to_bits() as $signed_key;
                 // negative floats need to have the rest flipped as well, extend the sign bit to the
                 // whole width with arithmetic right shift to get a flip mask 0x00...0 or 0xFF...F
-                let flip_negative_mask = ((bits as $signed_key) >> (BIT_COUNT-1)) as $radix_key;
+                let flip_negative_mask = bits >> (BIT_COUNT-1);
 
-                bits ^ (flip_negative_mask | FLIP_SIGN_MASK)
+                Self((bits ^ (flip_negative_mask | FLIP_SIGN_MASK)).to_le_bytes())
             }
         }
     )*)
 }
 
-key_impl_float! {
-    f32 => u32 : i32,
-    f64 => u64 : i64
-}
-
-mod private {
-    /// This trait serves as a seal for the `Scalar` trait to prevent downstream
-    /// implementations.
-    pub trait Sealed {}
-    macro_rules! sealed_impl { ($($t:ty)*) => ($(
-        impl Sealed for $t {}
-    )*) }
-    sealed_impl! {
-        bool char
-        u8 u16 u32 u64 u128 usize
-        i8 i16 i32 i64 i128 isize
-        f32 f64
-    }
-}
+key_impl_float! { f32 as i32, f64 as i64 }
 
 #[cfg(test)]
 mod tests {
@@ -203,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_key_bool() {
-        assert!(false.to_radix_key() < true.to_radix_key());
+        assert!(RadixKey::from(false) < RadixKey::from(true));
     }
 
     #[test]
@@ -217,7 +251,7 @@ mod tests {
         ];
         let expected = actual;
         actual.reverse();
-        actual.sort_by_key(|v| v.to_radix_key());
+        actual.sort_by_key(|&v| RadixKey::from(v));
         assert_eq!(actual, expected);
     }
 
@@ -234,7 +268,7 @@ mod tests {
                 ];
                 let mut expected = actual;
                 expected.sort();
-                actual.sort_by_key(|v| v.to_radix_key());
+                actual.sort_by_key(|&v| RadixKey::from(v));
                 assert_eq!(actual, expected);
             )*)
         }
@@ -274,7 +308,7 @@ mod tests {
             ];
             let expected = actual;
             actual.reverse();
-            actual.sort_by_key(|v| v.to_radix_key());
+            actual.sort_by_key(|&v| RadixKey::from(v));
             for (a, e) in actual.iter().zip(expected.iter()) {
                 assert_eq!(a.to_bits(), e.to_bits());
             }
@@ -307,7 +341,7 @@ mod tests {
             ];
             let expected = actual;
             actual.reverse();
-            actual.sort_by_key(|v| v.to_radix_key());
+            actual.sort_by_key(|&v| RadixKey::from(v));
             for (a, e) in actual.iter().zip(expected.iter()) {
                 assert_eq!(a.to_bits(), e.to_bits());
             }

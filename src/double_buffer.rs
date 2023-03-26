@@ -2,13 +2,13 @@ use core::{mem::MaybeUninit, slice};
 
 use alloc::{boxed::Box, vec::Vec};
 
-/// Double buffer. Wraps a mutable slice and allocates a scratch memory of the same size, so that
-/// elements can be freely scattered from buffer to buffer.
+/// Double buffer. Wraps a mutable slice and allocates a scratch memory of the
+/// same size, so that elements can be freely scattered from buffer to buffer.
 ///
 /// # Drop behavior
 ///
-/// Drop ensures that the mutable slice this buffer was constructed with contains all the original
-/// elements.
+/// Drop ensures that the mutable slice this buffer was constructed with
+/// contains all the original elements.
 pub struct DoubleBuffer<'a, T> {
     slice: &'a mut [MaybeUninit<T>],
     scratch: Box<[MaybeUninit<T>]>,
@@ -16,9 +16,11 @@ pub struct DoubleBuffer<'a, T> {
 }
 
 impl<'a, T> DoubleBuffer<'a, T> {
-    /// Creates a double buffer, allocating a scratch buffer of the same length as the input slice.
+    /// Creates a double buffer, allocating a scratch buffer of the same length
+    /// as the input slice.
     ///
-    /// The supplied slice becomes the read buffer, the scratch buffer becomes the write buffer.
+    /// The supplied slice becomes the read buffer, the scratch buffer becomes
+    /// the write buffer.
     pub fn new(slice: &'a mut [T]) -> Self {
         let slice = unsafe {
             // SAFETY: `[MaybeUninit<T>]` and `[T]` have the same layout.
@@ -40,32 +42,40 @@ impl<'a, T> DoubleBuffer<'a, T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.slice.len()
+    }
+
     /// Scatters the elements from the read buffer to the computed indices in
     /// the write buffer. The read buffer is iterated from the beginning.
     ///
+    /// Returns an error if the closure returns `index >= buffer.len()`.
+    ///
     /// Call `swap` after this function to commit the write buffer state.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the closure returns `index >= buffer length`.
-    pub fn scatter<F>(&mut self, mut indexer: F)
+    pub fn scatter<F>(&mut self, mut indexer: F) -> Result<(), ()>
     where
-        F: for<'t> FnMut(&'t T) -> usize,
+        F: FnMut(&T) -> usize,
     {
         let (read, write) = self.as_read_write_buffers();
 
+        let len = write.len();
+
         for t in read {
             let index = indexer(t);
+            if index >= len {
+                return Err(());
+            }
             let write_ptr = write[index].as_mut_ptr();
             unsafe {
                 // SAFETY: both pointers are valid for T, aligned, and nonoverlapping
                 write_ptr.copy_from_nonoverlapping(t as *const T, 1);
             }
         }
+        Ok(())
     }
 
     /// Returns the current read and write buffers.
-    fn as_read_write_buffers(&mut self) -> (&[T], &mut [MaybeUninit<T>]) {
+    pub fn as_read_write_buffers(&mut self) -> (&[T], &mut [MaybeUninit<T>]) {
         let (read, write): (&[MaybeUninit<T>], &mut [MaybeUninit<T>]) = if self.slice_is_write {
             (self.scratch.as_ref(), self.slice)
         } else {
@@ -96,9 +106,11 @@ impl<'a, T> DoubleBuffer<'a, T> {
 impl<'a, T> Drop for DoubleBuffer<'a, T> {
     fn drop(&mut self) {
         if self.slice_is_write {
-            // The input slice is the write buffer, copy the consistent state from the read buffer
+            // The input slice is the write buffer, copy the consistent state from the read
+            // buffer
             unsafe {
-                // SAFETY: `scratch` is the read buffer, it is initialized. The length is the same.
+                // SAFETY: `scratch` is the read buffer, it is initialized. The length is the
+                // same.
                 self.slice
                     .as_mut_ptr()
                     .copy_from_nonoverlapping(self.scratch.as_ptr(), self.slice.len());
