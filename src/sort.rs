@@ -128,11 +128,11 @@ where
 {
     let mut skip_digit = [false; W];
     let len = input.len();
-    let last_key = key_fn(input.last().unwrap());
+    let first_key = key_fn(input.first().unwrap());
     #[allow(clippy::needless_range_loop)]
     for digit in 0..W {
-        let last_bucket = last_key.bucket(digit);
-        let skip = bucket_sizes[digit][last_bucket].as_usize() == len;
+        let first_bucket = first_key.bucket(digit);
+        let skip = bucket_sizes[digit][first_bucket].as_usize() == len;
         skip_digit[digit] = skip;
     }
     skip_digit
