@@ -56,7 +56,7 @@ impl<const W: usize> RadixKey<W> {
         } else {
             return self.0[digit] as usize;
         }
-        ((u64::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
+        ((u32::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
     }
 
     #[cfg(target_pointer_width = "64")]
