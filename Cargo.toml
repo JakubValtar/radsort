@@ -11,5 +11,6 @@ homepage = "https://github.com/JakubValtar/radsort"
 categories = ["algorithms", "no-std"]
 keywords = ["sorting", "sort", "radix", "counting"]
 readme = "README.md"
+rust-version = "1.60.0"
 
 [dependencies]
