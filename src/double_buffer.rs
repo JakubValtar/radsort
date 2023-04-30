@@ -75,7 +75,7 @@ impl<'a, T> DoubleBuffer<'a, T> {
     }
 
     /// Returns the current read and write buffers.
-    pub fn as_read_write_buffers(&mut self) -> (&[T], &mut [MaybeUninit<T>]) {
+    fn as_read_write_buffers(&mut self) -> (&[T], &mut [MaybeUninit<T>]) {
         let (read, write): (&[MaybeUninit<T>], &mut [MaybeUninit<T>]) = if self.slice_is_write {
             (self.scratch.as_ref(), self.slice)
         } else {
