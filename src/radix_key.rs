@@ -27,7 +27,7 @@ impl<const W: usize> RadixKey<W> {
 
     #[cfg(target_pointer_width = "32")]
     #[inline(always)]
-    pub fn bucket(&self, mut digit: usize) -> usize {
+    pub fn bucket(&self, digit: usize) -> usize {
         let mut key = [0u8; 4];
         if W == 1 {
             return self.0[0] as usize;
@@ -38,30 +38,26 @@ impl<const W: usize> RadixKey<W> {
                 key.copy_from_slice(&self.0[0..4]);
             } else {
                 key.copy_from_slice(&self.0[4..8]);
-                digit -= 4;
             }
         } else if W == 16 {
             if digit < 4 {
                 key.copy_from_slice(&self.0[0..4]);
             } else if digit < 8 {
                 key.copy_from_slice(&self.0[4..8]);
-                digit -= 4;
             } else if digit < 12 {
                 key.copy_from_slice(&self.0[8..12]);
-                digit -= 8;
             } else {
                 key.copy_from_slice(&self.0[12..16]);
-                digit -= 12;
             }
         } else {
             return self.0[digit] as usize;
         }
-        ((u32::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
+        (u32::from_le_bytes(key).wrapping_shr(8 * digit as u32) & 0xFF) as usize
     }
 
     #[cfg(target_pointer_width = "64")]
     #[inline(always)]
-    pub fn bucket(&self, mut digit: usize) -> usize {
+    pub fn bucket(&self, digit: usize) -> usize {
         let mut key = [0u8; 8];
         if W == 1 {
             return self.0[0] as usize;
@@ -72,12 +68,11 @@ impl<const W: usize> RadixKey<W> {
                 key.copy_from_slice(&self.0[0..8]);
             } else {
                 key.copy_from_slice(&self.0[8..16]);
-                digit -= 8;
             }
         } else {
             return self.0[digit] as usize;
         }
-        ((u64::from_le_bytes(key) >> (digit * 8)) & 0xFF) as usize
+        (u64::from_le_bytes(key).wrapping_shr(8 * digit as u32) & 0xFF) as usize
     }
 }
 
