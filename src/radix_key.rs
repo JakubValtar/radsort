@@ -28,50 +28,56 @@ impl<const W: usize> RadixKey<W> {
     #[cfg(target_pointer_width = "32")]
     #[inline(always)]
     pub fn bucket(&self, digit: usize) -> usize {
-        let mut key = [0u8; 4];
-        if W == 1 {
+        use core::convert::TryInto;
+
+        let key = if W == 1 {
             return self.0[0] as usize;
         } else if W <= 4 {
-            key[..W].copy_from_slice(&self.0);
+            let mut bytes = [0u8; 4];
+            bytes[..W].copy_from_slice(&self.0);
+            bytes
         } else if W == 8 {
             if digit < 4 {
-                key.copy_from_slice(&self.0[0..4]);
+                self.0[0..4].try_into().unwrap()
             } else {
-                key.copy_from_slice(&self.0[4..8]);
+                self.0[4..8].try_into().unwrap()
             }
         } else if W == 16 {
             if digit < 4 {
-                key.copy_from_slice(&self.0[0..4]);
+                self.0[0..4].try_into().unwrap()
             } else if digit < 8 {
-                key.copy_from_slice(&self.0[4..8]);
+                self.0[4..8].try_into().unwrap()
             } else if digit < 12 {
-                key.copy_from_slice(&self.0[8..12]);
+                self.0[8..12].try_into().unwrap()
             } else {
-                key.copy_from_slice(&self.0[12..16]);
+                self.0[12..16].try_into().unwrap()
             }
         } else {
             return self.0[digit] as usize;
-        }
+        };
         (u32::from_le_bytes(key).wrapping_shr(8 * digit as u32) & 0xFF) as usize
     }
 
     #[cfg(target_pointer_width = "64")]
     #[inline(always)]
     pub fn bucket(&self, digit: usize) -> usize {
-        let mut key = [0u8; 8];
-        if W == 1 {
+        use core::convert::TryInto;
+
+        let key: [u8; 8] = if W == 1 {
             return self.0[0] as usize;
         } else if W <= 8 {
-            key[..W].copy_from_slice(&self.0);
+            let mut bytes = [0u8; 8];
+            bytes[..W].copy_from_slice(&self.0);
+            bytes
         } else if W == 16 {
             if digit < 8 {
-                key.copy_from_slice(&self.0[0..8]);
+                self.0[0..8].try_into().unwrap()
             } else {
-                key.copy_from_slice(&self.0[8..16]);
+                self.0[8..16].try_into().unwrap()
             }
         } else {
             return self.0[digit] as usize;
-        }
+        };
         (u64::from_le_bytes(key).wrapping_shr(8 * digit as u32) & 0xFF) as usize
     }
 }
