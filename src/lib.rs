@@ -125,10 +125,6 @@ pub fn sort<T: Key>(slice: &mut [T]) {
     Key::sort_by_key(slice, |v| *v, Config::default());
 }
 
-pub fn sort_u64(slice: &mut [u64]) {
-    Key::sort_by_key(slice, |v| *v, Config::default());
-}
-
 /// Sorts the slice using a key extraction function.
 ///
 /// Key can be any scalar type. See [`Key`] for a full list.
