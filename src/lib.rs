@@ -101,6 +101,7 @@ mod radix_key;
 mod sort;
 
 use crate::radix_key::RadixKey;
+use crate::sort::Config;
 
 /// Sorts the slice.
 ///
@@ -121,11 +122,11 @@ use crate::radix_key::RadixKey;
 /// ```
 /// [`Key`]: trait.Key.html
 pub fn sort<T: Key>(slice: &mut [T]) {
-    Key::sort_by_key(slice, |v| *v, false);
+    Key::sort_by_key(slice, |v| *v, Config::default());
 }
 
 pub fn sort_u64(slice: &mut [u64]) {
-    Key::sort_by_key(slice, |v| *v, false);
+    Key::sort_by_key(slice, |v| *v, Config::default());
 }
 
 /// Sorts the slice using a key extraction function.
@@ -164,7 +165,7 @@ where
     F: FnMut(&T) -> K,
     K: Key,
 {
-    Key::sort_by_key(slice, |t| key_fn(t), false);
+    Key::sort_by_key(slice, |t| key_fn(t), Config::default());
 }
 
 /// Sorts the slice indirectly, using a key extraction function and caching the keys.
@@ -204,7 +205,7 @@ where
     F: FnMut(&T) -> K,
     K: Key,
 {
-    sort_by_cached_key_internal(slice, key_fn, false);
+    sort_by_cached_key_internal(slice, key_fn, Config::default());
 }
 
 /// Sorting functions which don't use optimizations based on the values
@@ -230,11 +231,13 @@ pub mod unopt {
 
     use super::*;
 
+    const UNOPT_CONFIG: Config = Config::without_value_based_optimizations();
+
     /// Version of [`sort`](../fn.sort.html) which does not skip digits (bytes).
     ///
     /// See the [module documentation](./index.html) for more details.
     pub fn sort<T: Key>(slice: &mut [T]) {
-        Key::sort_by_key(slice, |v| *v, true);
+        Key::sort_by_key(slice, |v| *v, UNOPT_CONFIG);
     }
 
     /// Version of [`sort_by_key`](../fn.sort_by_key.html) which does not skip digits (bytes).
@@ -245,7 +248,7 @@ pub mod unopt {
         F: FnMut(&T) -> K,
         K: Key,
     {
-        Key::sort_by_key(slice, |t| key_fn(t), true);
+        Key::sort_by_key(slice, |t| key_fn(t), UNOPT_CONFIG);
     }
 
     /// Version of [`sort_by_cached_key`](../fn.sort_by_cached_key.html) which does not skip digits (bytes).
@@ -256,11 +259,11 @@ pub mod unopt {
         F: FnMut(&T) -> K,
         K: Key,
     {
-        sort_by_cached_key_internal(slice, key_fn, true);
+        sort_by_cached_key_internal(slice, key_fn, UNOPT_CONFIG);
     }
 }
 
-fn sort_by_cached_key_internal<T, F, K>(slice: &mut [T], mut key_fn: F, unopt: bool)
+fn sort_by_cached_key_internal<T, F, K>(slice: &mut [T], mut key_fn: F, config: Config)
 where
     F: FnMut(&T) -> K,
     K: Key,
@@ -276,7 +279,7 @@ where
                 .map(|(i, k)| (k, i as $index))
                 .collect();
 
-            Key::sort_by_key(&mut indices, |(k, _)| *k, unopt);
+            Key::sort_by_key(&mut indices, |(k, _)| *k, config);
 
             for i in 0..slice.len() {
                 let mut index = indices[i].1;
@@ -331,15 +334,12 @@ where
 /// [`sort`]: fn.sort.html
 /// [`sort_by_key`]: fn.sort_by_key.html
 pub trait Key: Copy + private::Sealed {
-    // If this crate didn't support tuples, this trait wouldn't be needed and
-    // Scalar could be exposed directly to users as the `Key` trait.
-
     /// Sorts the slice using `Self` as the type of the key.
     ///
     /// You shouldn't need to call this directly, use one of the functions in
     /// the [crate root](index.html#functions) instead.
     #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], key_fn: F, unopt: bool)
+    fn sort_by_key<T, F>(slice: &mut [T], key_fn: F, config: Config)
     where
         F: FnMut(&T) -> Self;
 }
@@ -347,10 +347,10 @@ pub trait Key: Copy + private::Sealed {
 macro_rules! impl_for_scalar { ($($t:ty)*) => ($(
     impl Key for $t {
         #[doc(hidden)]
-        fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
+        fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, config: Config)
             where F: FnMut(&T) -> Self
         {
-            sort::dispatch_sort(slice, |t| RadixKey::from(key_fn(t)), unopt);
+            sort::dispatch_sort(slice, |t| RadixKey::from(key_fn(t)), config);
         }
     }
 )*) }
