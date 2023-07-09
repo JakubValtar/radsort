@@ -114,48 +114,6 @@ fn sort_struct() {
     }
 }
 
-/// Test sorting by multiple keys in a tuple.
-#[test]
-fn sort_compound() {
-    let mut actual = Vec::new();
-
-    for a in 0..5 {
-        for b in 0..5 {
-            for c in 0..5 {
-                for d in 0..5 {
-                    actual.push([a, b, c, d]);
-                }
-            }
-        }
-    }
-
-    actual.reverse();
-
-    let mut expected = actual.clone();
-
-    radsort::sort_by_key(&mut expected, |a| a[0]);
-    radsort::sort_by_key(&mut actual, |a| (a[0],));
-    assert_eq!(actual, expected);
-
-    radsort::sort_by_key(&mut expected, |a| a[1]);
-    radsort::sort_by_key(&mut expected, |a| a[0]);
-    radsort::sort_by_key(&mut actual, |a| (a[0], a[1]));
-    assert_eq!(actual, expected);
-
-    radsort::sort_by_key(&mut expected, |a| a[2]);
-    radsort::sort_by_key(&mut expected, |a| a[1]);
-    radsort::sort_by_key(&mut expected, |a| a[0]);
-    radsort::sort_by_key(&mut actual, |a| (a[0], a[1], a[2]));
-    assert_eq!(actual, expected);
-
-    radsort::sort_by_key(&mut expected, |a| a[3]);
-    radsort::sort_by_key(&mut expected, |a| a[2]);
-    radsort::sort_by_key(&mut expected, |a| a[1]);
-    radsort::sort_by_key(&mut expected, |a| a[0]);
-    radsort::sort_by_key(&mut actual, |a| (a[0], a[1], a[2], a[3]));
-    assert_eq!(actual, expected);
-}
-
 #[test]
 fn sort_zst() {
     let mut actual = [(); 10];

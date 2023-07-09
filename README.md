@@ -7,9 +7,9 @@
 (integers, floats, chars, bools).
 
 All built-in scalar types can be used as sorting keys: Booleans, characters,
-integers, and floating point-numbers. To sort by multiple keys, put them in
-a tuple, starting from the most significant key. See [`Key`] for a full list
-of supported keys.
+integers, and floating point-numbers. To sort by multiple keys, either
+combine them into a single key, or run the sort for each key, starting from
+the least significant key. See [`Key`] for a full list of supported keys.
 
 - best and worst-case running time is `O(n)` – see [benchmarks] for more
 detailed performance characteristics
@@ -65,8 +65,9 @@ radsort::sort_by_key(&mut friends, |s| s.len());
 assert_eq!(friends, ["Sly", "Punchy", "Gladys", "Puddles", "Isabelle"]);
 ```
 
-To sort by two or more keys, put them in a tuple, starting with the most
-significant key:
+To sort by two or more keys, either combine them into a single scalar key,
+or run the sort for each key, starting from the least significant (this
+works for any stable sort):
 ```rust
 struct Height { feet: u8, inches: u8, }
 
@@ -76,8 +77,9 @@ let mut heights = [
     Height { feet: 6, inches: 0 },
 ];
 
-// sort by feet, if feet are equal, sort by inches
-radsort::sort_by_key(&mut heights, |h| (h.feet, h.inches));
+// Sort per key, starting from the least significant
+radsort::sort_by_key(&mut heights, |h| h.inches);
+radsort::sort_by_key(&mut heights, |h| h.feet);
 
 assert_eq!(heights, [
     Height { feet: 5, inches: 9 },

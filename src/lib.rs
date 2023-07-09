@@ -2,9 +2,9 @@
 //! (integers, floats, chars, bools).
 //!
 //! All built-in scalar types can be used as sorting keys: Booleans, characters,
-//! integers, and floating point-numbers. To sort by multiple keys, put them in
-//! a tuple, starting from the most significant key. See [`Key`] for a full list
-//! of supported keys.
+//! integers, and floating point-numbers. To sort by multiple keys, either
+//! combine them into a single key, or run the sort for each key, starting from
+//! the least significant key. See [`Key`] for a full list of supported keys.
 //!
 //! - best and worst-case running time is `O(n)` – see [benchmarks] for more
 //! detailed performance characteristics
@@ -60,8 +60,9 @@
 //! assert_eq!(friends, ["Sly", "Punchy", "Gladys", "Puddles", "Isabelle"]);
 //! ```
 //!
-//! To sort by two or more keys, put them in a tuple, starting with the most
-//! significant key:
+//! To sort by two or more keys, either combine them into a single scalar key,
+//! or run the sort for each key, starting from the least significant (this
+//! works for any stable sort):
 //! ```rust
 //! # #[derive(Debug, PartialEq)]
 //! struct Height { feet: u8, inches: u8, }
@@ -72,8 +73,9 @@
 //!     Height { feet: 6, inches: 0 },
 //! ];
 //!
-//! // sort by feet, if feet are equal, sort by inches
-//! radsort::sort_by_key(&mut heights, |h| (h.feet, h.inches));
+//! // Sort per key, starting from the least significant
+//! radsort::sort_by_key(&mut heights, |h| h.inches);
+//! radsort::sort_by_key(&mut heights, |h| h.feet);
 //!
 //! assert_eq!(heights, [
 //!     Height { feet: 5, inches: 9 },
@@ -360,54 +362,7 @@ impl_for_scalar! {
     f32 f64
 }
 
-impl<A: Key> Key for (A,) {
-    #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
-    where
-        F: FnMut(&T) -> Self,
-    {
-        A::sort_by_key(slice, |t| key_fn(t).0, unopt);
-    }
-}
-
-impl<A: Key, B: Key> Key for (A, B) {
-    #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
-    where
-        F: FnMut(&T) -> Self,
-    {
-        B::sort_by_key(slice, |t| key_fn(t).1, unopt);
-        A::sort_by_key(slice, |t| key_fn(t).0, unopt);
-    }
-}
-
-impl<A: Key, B: Key, C: Key> Key for (A, B, C) {
-    #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
-    where
-        F: FnMut(&T) -> Self,
-    {
-        C::sort_by_key(slice, |t| key_fn(t).2, unopt);
-        B::sort_by_key(slice, |t| key_fn(t).1, unopt);
-        A::sort_by_key(slice, |t| key_fn(t).0, unopt);
-    }
-}
-
-impl<A: Key, B: Key, C: Key, D: Key> Key for (A, B, C, D) {
-    #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, unopt: bool)
-    where
-        F: FnMut(&T) -> Self,
-    {
-        D::sort_by_key(slice, |t| key_fn(t).3, unopt);
-        C::sort_by_key(slice, |t| key_fn(t).2, unopt);
-        B::sort_by_key(slice, |t| key_fn(t).1, unopt);
-        A::sort_by_key(slice, |t| key_fn(t).0, unopt);
-    }
-}
-
 mod private {
-    use super::*;
     /// This trait serves as a seal for the `Key` trait to prevent downstream
     /// implementations.
     pub trait Sealed {}
@@ -421,8 +376,4 @@ mod private {
         i8 i16 i32 i64 i128 isize
         f32 f64
     }
-    impl<A: Key> Sealed for (A,) {}
-    impl<A: Key, B: Key> Sealed for (A, B) {}
-    impl<A: Key, B: Key, C: Key> Sealed for (A, B, C) {}
-    impl<A: Key, B: Key, C: Key, D: Key> Sealed for (A, B, C, D) {}
 }
