@@ -88,7 +88,6 @@
 //! [`sort_by_cached_key`]: ./fn.sort_by_cached_key.html
 //! [`PartialOrd`]: https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html
 
-#![warn(clippy::all)]
 #![no_std]
 
 extern crate alloc;

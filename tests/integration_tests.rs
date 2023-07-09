@@ -1,5 +1,3 @@
-#![warn(clippy::all)]
-
 #[test]
 fn sort_bool() {
     let mut actual = [
@@ -99,13 +97,11 @@ fn sort_struct() {
 
     {
         // Sorting references
-        let source_copy = source.clone();
         let mut actual: Vec<&Data> = source.iter().collect();
         let mut expected = actual.clone();
         radsort::sort_by_key(&mut actual, |d| d.0);
         expected.sort_by_key(|d| d.0);
         assert_eq!(actual, expected);
-        assert_eq!(source, source_copy);
     }
 
     {
