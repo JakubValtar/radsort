@@ -85,7 +85,7 @@
 //! ```
 //!
 //! [`Key`]: ./trait.Key.html
-//! [`unopt`]: ./unopt/index.html
+//! [`fixed_work`]: ./unopt/index.html
 //! [benchmarks]: https://github.com/JakubValtar/radsort/wiki/Benchmarks
 //! [`sort_by_cached_key`]: ./fn.sort_by_cached_key.html
 //! [`PartialOrd`]: https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html
@@ -101,7 +101,7 @@ mod radix_key;
 mod sort;
 
 use crate::radix_key::RadixKey;
-use crate::sort::Config;
+use crate::sort::Profile;
 
 /// Sorts the slice.
 ///
@@ -122,7 +122,7 @@ use crate::sort::Config;
 /// ```
 /// [`Key`]: trait.Key.html
 pub fn sort<T: Key>(slice: &mut [T]) {
-    Key::sort_by_key(slice, |v| *v, Config::default());
+    Key::sort_by_key(slice, |v| *v, Profile::Fastest);
 }
 
 /// Sorts the slice using a key extraction function.
@@ -161,7 +161,7 @@ where
     F: FnMut(&T) -> K,
     K: Key,
 {
-    Key::sort_by_key(slice, |t| key_fn(t), Config::default());
+    Key::sort_by_key(slice, |t| key_fn(t), Profile::Fastest);
 }
 
 /// Sorts the slice indirectly, using a key extraction function and caching the keys.
@@ -169,20 +169,18 @@ where
 /// Key can be any scalar type. See [`Key`] for a full list.
 ///
 /// This sort is stable (i.e., does not reorder equal elements) and
-/// `O(m n + w n)`, where the key function is `O(m)`.
+/// `O(m n + w n)`, where `w` is the size of the key, and the key function is
+/// `O(m)`.
 ///
 /// This function can be significantly faster for sorting by an expensive key
-/// function or for sorting large elements. The keys are extracted, sorted, and
-/// then the elements of the slice are reordered in-place. This saves CPU cycles
-/// in case of an expensive key function and saves memory bandwidth in case of
-/// large elements.
+/// function or for sorting large elements.
 ///
 /// For sorting small elements by simple key functions (e.g., functions that are
 /// property accesses or basic operations), [`sort_by_key`] is likely to be
 /// faster.
 ///
-/// In the worst case, allocates temporary storage in a `Vec<(K, usize)>` twice
-/// the length of the slice.
+/// In the worst case, allocates a temporary storage in a `Vec<(K, usize)>`
+/// twice the length of the slice.
 ///
 /// # Examples
 ///
@@ -201,42 +199,38 @@ where
     F: FnMut(&T) -> K,
     K: Key,
 {
-    sort_by_cached_key_internal(slice, key_fn, Config::default());
+    sort_by_cached_key_internal(slice, key_fn, Profile::Fastest);
 }
 
-/// Sorting functions which don't use optimizations based on the values
-/// of the keys. Useful for benchmarks and consistent performance.
+/// Functions for sorting the slice with a fixed number of operations per
+/// element.
 ///
-/// For each digit (byte) of the key, `radsort` reorders the slice once.
-/// Functions in the crate root sort only by the bytes which differ between the
-/// keys. This can lead to large differences in sorting time, based on the
-/// values in the slice.
+/// These functions do not perform optimizations based on element values, making
+/// the best-case and the worst-case scenarios the same, which results in a more
+/// predictable performance.
 ///
-/// For example, sorting `u32` all less than `u8::MAX` will sort only by
-/// the least significant byte and skip the three most significant bytes,
-/// which are zero; this cuts the sorting time to roughly one quarter, plus
-/// the overhead of analyzing the keys.
+/// This is useful in contexts sensitive to worst-case performance and for
+/// testing, as the number of operations depends only on the slice length, not
+/// on the runtime values. Sorting two slices of the same type with the same
+/// number of elements and using the same key type will perform the same number
+/// of operations and memory accesses.
 ///
-/// Unlike functions in the crate root, functions in this module don't use
-/// this optimization and sort by all bytes of the key. This leads to worse but
-/// more consistent performance. The effects of the CPU cache will still play a
-/// role, but at least the number of executed instructions will not depend on
-/// the values in the slice, only on the length of the slice and the width of
-/// the key type.
-pub mod unopt {
+/// Keep in mind that even though the number of memory accesses is the same,
+/// the cache and memory access order is still going to make a difference.
+pub mod fixed_work {
 
     use super::*;
 
-    const UNOPT_CONFIG: Config = Config::without_value_based_optimizations();
-
-    /// Version of [`sort`](../fn.sort.html) which does not skip digits (bytes).
+    /// Version of [`sort`](../fn.sort.html) which performs a fixed number of
+    /// operations per element.
     ///
     /// See the [module documentation](./index.html) for more details.
     pub fn sort<T: Key>(slice: &mut [T]) {
-        Key::sort_by_key(slice, |v| *v, UNOPT_CONFIG);
+        Key::sort_by_key(slice, |v| *v, Profile::FixedWorkPerElement);
     }
 
-    /// Version of [`sort_by_key`](../fn.sort_by_key.html) which does not skip digits (bytes).
+    /// Version of [`sort_by_key`](../fn.sort_by_key.html) which performs a
+    /// fixed number of operations per element.
     ///
     /// See the [module documentation](./index.html) for more details.
     pub fn sort_by_key<T, F, K>(slice: &mut [T], mut key_fn: F)
@@ -244,10 +238,11 @@ pub mod unopt {
         F: FnMut(&T) -> K,
         K: Key,
     {
-        Key::sort_by_key(slice, |t| key_fn(t), UNOPT_CONFIG);
+        Key::sort_by_key(slice, |t| key_fn(t), Profile::FixedWorkPerElement);
     }
 
-    /// Version of [`sort_by_cached_key`](../fn.sort_by_cached_key.html) which does not skip digits (bytes).
+    /// Version of [`sort_by_cached_key`](../fn.sort_by_cached_key.html) which
+    /// performs a fixed number of operations per element.
     ///
     /// See the [module documentation](./index.html) for more details.
     pub fn sort_by_cached_key<T, F, K>(slice: &mut [T], key_fn: F)
@@ -255,11 +250,11 @@ pub mod unopt {
         F: FnMut(&T) -> K,
         K: Key,
     {
-        sort_by_cached_key_internal(slice, key_fn, UNOPT_CONFIG);
+        sort_by_cached_key_internal(slice, key_fn, Profile::FixedWorkPerElement);
     }
 }
 
-fn sort_by_cached_key_internal<T, F, K>(slice: &mut [T], mut key_fn: F, config: Config)
+fn sort_by_cached_key_internal<T, F, K>(slice: &mut [T], mut key_fn: F, profile: Profile)
 where
     F: FnMut(&T) -> K,
     K: Key,
@@ -275,7 +270,7 @@ where
                 .map(|(i, k)| (k, i as $index))
                 .collect();
 
-            Key::sort_by_key(&mut indices, |(k, _)| *k, config);
+            Key::sort_by_key(&mut indices, |(k, _)| *k, profile);
 
             for i in 0..slice.len() {
                 let mut index = indices[i].1;
@@ -335,7 +330,7 @@ pub trait Key: Copy + private::Sealed {
     /// You shouldn't need to call this directly, use one of the functions in
     /// the [crate root](index.html#functions) instead.
     #[doc(hidden)]
-    fn sort_by_key<T, F>(slice: &mut [T], key_fn: F, config: Config)
+    fn sort_by_key<T, F>(slice: &mut [T], key_fn: F, profile: Profile)
     where
         F: FnMut(&T) -> Self;
 }
@@ -343,10 +338,10 @@ pub trait Key: Copy + private::Sealed {
 macro_rules! impl_for_scalar { ($($t:ty)*) => ($(
     impl Key for $t {
         #[doc(hidden)]
-        fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, config: Config)
+        fn sort_by_key<T, F>(slice: &mut [T], mut key_fn: F, profile: Profile)
             where F: FnMut(&T) -> Self
         {
-            sort::dispatch_sort(slice, |t| RadixKey::from(key_fn(t)), config);
+            sort::dispatch_sort(slice, |t| RadixKey::from(key_fn(t)), profile);
         }
     }
 )*) }

@@ -6,38 +6,9 @@ use crate::{double_buffer::DoubleBuffer, radix_key::RadixKey};
 
 const BUCKET_COUNT: usize = 256;
 
-#[derive(Clone)]
-pub struct Config {
-    skip_single_value_digits: bool,
-}
-
-impl Config {
-    pub const fn with_value_based_optimizations() -> Self {
-        Self {
-            skip_single_value_digits: true,
-        }
-    }
-
-    pub const fn without_value_based_optimizations() -> Self {
-        Self {
-            skip_single_value_digits: false,
-        }
-    }
-
-    pub const fn skip_single_value_digits(&self) -> bool {
-        self.skip_single_value_digits
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self::with_value_based_optimizations()
-    }
-}
-
 /// Dispatches the sort. Chooses the smallest offset type that can represent all
 /// positions in the slice.
-pub(crate) fn dispatch_sort<T, F, const W: usize>(slice: &mut [T], key_fn: F, config: Config)
+pub(crate) fn dispatch_sort<T, F, const W: usize>(slice: &mut [T], key_fn: F, profile: Profile)
 where
     F: FnMut(&T) -> RadixKey<W>,
 {
@@ -50,15 +21,15 @@ where
     match slice.len() {
         len if len < 2 => (),
         len if len <= core::u8::MAX as usize => {
-            sort::<u8, T, _, W>(slice, key_fn, config);
+            sort::<u8, T, _, W>(slice, key_fn, profile);
         }
         #[cfg(not(target_pointer_width = "16"))]
         len if len <= core::u16::MAX as usize => {
-            sort::<u16, T, _, W>(slice, key_fn, config);
+            sort::<u16, T, _, W>(slice, key_fn, profile);
         }
         #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
         len if len <= core::u32::MAX as usize => {
-            sort::<u32, T, _, W>(slice, key_fn, config);
+            sort::<u32, T, _, W>(slice, key_fn, profile);
         }
         #[cfg(not(any(
             target_pointer_width = "16",
@@ -66,10 +37,10 @@ where
             target_pointer_width = "64"
         )))]
         len if len <= core::u64::MAX as usize => {
-            sort::<u64, T, _, W>(slice, key_fn, config);
+            sort::<u64, T, _, W>(slice, key_fn, profile);
         }
         _ => {
-            sort::<usize, T, _, W>(slice, key_fn, config);
+            sort::<usize, T, _, W>(slice, key_fn, profile);
         }
     }
 }
@@ -81,7 +52,7 @@ where
 /// Panics on a best effort basis if the key function returned different keys
 /// when called repeatedly with the same parameter.
 #[inline(never)]
-fn sort<O, T, F, const W: usize>(input: &mut [T], mut key_fn: F, config: Config)
+fn sort<O, T, F, const W: usize>(input: &mut [T], mut key_fn: F, profile: Profile)
 where
     O: Offset,
     F: FnMut(&T) -> RadixKey<W>,
@@ -92,10 +63,9 @@ where
 
     calc_bucket_sizes(input, &mut bucket_sizes, &mut key_fn);
 
-    let skip_digit = if config.skip_single_value_digits() {
-        calc_skip_digits(input, &bucket_sizes, &mut key_fn)
-    } else {
-        [false; W]
+    let skip_digit = match profile {
+        Profile::Fastest => calc_skip_digits(input, &bucket_sizes, &mut key_fn),
+        Profile::FixedWorkPerElement => [false; W],
     };
 
     let bucket_offsets = convert_bucket_sizes_to_offsets(&mut bucket_sizes, &skip_digit);
@@ -121,6 +91,26 @@ where
             }
         }
     }
+}
+
+/// A performance profile.
+pub enum Profile {
+    /// Sort the slice as fast as possible.
+    ///
+    /// The number of operations per element may change based on the runtime
+    /// values of the keys. The current impl skips sorting by digits with only
+    /// one bucket (= no need to reorder).
+    Fastest,
+
+    /// Sort the slice with a fixed number of operations per element.
+    ///
+    /// This is useful in contexts sensitive to worst-case performance and for
+    /// testing, as the number of operations depends only on the slice length,
+    /// not on the runtime values.
+    ///
+    /// Sorting two slices of the same type with the same number of elements and
+    /// using the same key type will perform the same number of operations.
+    FixedWorkPerElement,
 }
 
 /// Calculates the bucket sizes.
