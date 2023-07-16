@@ -1,17 +1,12 @@
-//! `radsort` is a radix sort implementation for sorting by scalar keys
-//! (integers, floats, chars, bools).
+//! Radsort is a stable LSB radix sort with `O(w⋅n)` worst-case time complexity,
+//! `O(w)` stack space and `O(n)` heap space requirements, where `w` is the key
+//! size in bytes and `n` is the number of elements to be sorted.
 //!
-//! All built-in scalar types can be used as sorting keys: Booleans, characters,
-//! integers, and floating point-numbers. To sort by multiple keys, either
-//! combine them into a single key, or run the sort for each key, starting from
-//! the least significant key. See [`Key`] for a full list of supported keys.
+//! For a list of supported sorting keys, see the [`Key`] trait. It is implemented for:
+//! - integers, chars, bools: ordering equivalent to their `Ord` implementation,
+//! - floats: ordering equivalent to [`total_cmp`] ordering.
 //!
-//! - best and worst-case running time is `O(n)` – see [benchmarks] for more
-//! detailed performance characteristics
-//! - space complexity is `O(n)` – direct sort allocates temporary storage the
-//! size of the slice, for indirect see [`sort_by_cached_key`]
-//! - stable, i.e. does not reorder equal elements
-//! - uses `#![no_std]`, but needs an allocator
+//! Supports `no-std` with `alloc`.
 //!
 //! This sort can be several times faster than `slice::sort` and
 //! `slice::sort_unstable`, typically on large slices (hundreds of elements or
@@ -19,24 +14,15 @@
 //! (16 bytes). See [benchmarks] to get a better picture of the performance
 //! characteristics.
 //!
-//! `radsort` is an implementation of LSB radix sort, using counting sort to
-//! sort the slice by each digit (byte) of the key. As an optimization, the
-//! slice is sorted only by digits which differ between the keys. See the
-//! [`unopt`] module for more details and functions which don't use this
-//! optimization.
+//! If you value consistency over speed, see the [`fixed_work`] module. It
+//! contains sorting functions that perform a fixed number of operations per
+//! element. This is useful for testing the worst-case scenario, or when you
+//! don't want the values of the sorted elements to affect the performance.
 //!
-//! This implementation is based on radix sort by Pierre Terdiman,
-//! published at
-//! [http://codercorner.com/RadixSortRevisited.htm](http://codercorner.com/RadixSortRevisited.htm),
-//! with select optimizations published by Michael Herf at
-//! [http://stereopsis.com/radix.html](http://stereopsis.com/radix.html).
-//!
-//! # Floating-point numbers
-//!
-//! Floating-point number keys are effectively sorted according to their partial
-//! order (see [`PartialOrd`]), with `NaN` values at the beginning (before the
-//! negative infinity) and at the end (after the positive infinity), depending
-//! on the sign bit of each `NaN`.
+//! This implementation is based on radix sort by
+//! [Pierre Terdiman](http://codercorner.com/RadixSortRevisited.htm),
+//! with select optimizations published by
+//! [Michael Herf](http://stereopsis.com/radix.html).
 //!
 //! # Examples
 //!
@@ -85,10 +71,10 @@
 //! ```
 //!
 //! [`Key`]: ./trait.Key.html
-//! [`fixed_work`]: ./unopt/index.html
+//! [`Ord`]: https://doc.rust-lang.org/std/cmp/trait.Ord.html
+//! [`total_cmp`]: https://doc.rust-lang.org/std/primitive.f64.html#method.total_cmp
+//! [`fixed_work`]: ./fixed_work/index.html
 //! [benchmarks]: https://github.com/JakubValtar/radsort/wiki/Benchmarks
-//! [`sort_by_cached_key`]: ./fn.sort_by_cached_key.html
-//! [`PartialOrd`]: https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html
 
 #![no_std]
 
@@ -105,9 +91,7 @@ use crate::sort::Profile;
 
 /// Sorts the slice.
 ///
-/// Slice elements can be any scalar type. See [`Key`] for a full list.
-///
-/// This sort is stable (i.e., does not reorder equal elements) and `O(w n)`,
+/// This sort is stable (i.e., does not reorder equal elements) and `O(w⋅n)`,
 /// where `w` is the size of the key in bytes.
 ///
 /// Allocates temporary storage the size of the slice.
@@ -127,9 +111,7 @@ pub fn sort<T: Key>(slice: &mut [T]) {
 
 /// Sorts the slice using a key extraction function.
 ///
-/// Key can be any scalar type. See [`Key`] for a full list.
-///
-/// This sort is stable (i.e., does not reorder equal elements) and `O(w m n)`,
+/// This sort is stable (i.e., does not reorder equal elements) and `O(w⋅m⋅n)`,
 /// where the key function is `O(m)` and `w` is the size of the key in bytes.
 ///
 /// Allocates temporary storage the size of the slice.
@@ -166,21 +148,23 @@ where
 
 /// Sorts the slice indirectly, using a key extraction function and caching the keys.
 ///
-/// Key can be any scalar type. See [`Key`] for a full list.
-///
 /// This sort is stable (i.e., does not reorder equal elements) and
-/// `O(m n + w n)`, where `w` is the size of the key, and the key function is
-/// `O(m)`.
+/// `O(m⋅n + w⋅n)`, where the key function is `O(m)` and `w` is the size of the
+/// key in bytes.
 ///
 /// This function can be significantly faster for sorting by an expensive key
-/// function or for sorting large elements.
-///
-/// For sorting small elements by simple key functions (e.g., functions that are
-/// property accesses or basic operations), [`sort_by_key`] is likely to be
-/// faster.
+/// function or for sorting large elements. For sorting small elements by simple
+/// key functions (e.g., functions that are property accesses or basic
+/// operations), [`sort_by_key`] is likely to be faster.
 ///
 /// In the worst case, allocates a temporary storage in a `Vec<(K, usize)>`
 /// twice the length of the slice.
+///
+/// # Panics
+///
+/// Can panic if the key function returns different keys for the same element
+/// when called repeatedly. The panic is on a best-effort basis. In case of
+/// panic, the order of elements in the slice is not specified.
 ///
 /// # Examples
 ///
@@ -315,8 +299,6 @@ where
 }
 
 /// Types which can be used as sorting keys.
-///
-/// Implemented for all scalar types and their tuples.
 ///
 /// Slices of types for which `Key` is implemented can be sorted directly using
 /// [`sort`]. Slices of other types can be sorted using [`sort_by_key`] with a
