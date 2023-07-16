@@ -42,7 +42,7 @@ where
     F: FnMut(&T) -> RadixKey<W>,
 {
     // Sorting has no meaningful behavior on zero-sized types.
-    if mem::size_of::<T>() == 0 {
+    if W == 0 || mem::size_of::<T>() == 0 {
         return;
     }
 
