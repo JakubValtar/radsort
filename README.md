@@ -6,24 +6,31 @@
 Radsort is a stable LSB radix sort with `O(w⋅n)` worst-case time complexity,
 `O(w)` stack space and `O(n)` heap space requirements, where `w` is the key
 size in bytes and `n` is the number of elements to be sorted.
+
 For a list of supported sorting keys, see the [`Key`] trait. It is implemented for:
 - integers, chars, bools: ordering equivalent to their `Ord` implementation,
 - floats: ordering equivalent to [`total_cmp`] ordering.
+
 Supports `no-std` with `alloc`.
+
 This sort can be several times faster than `slice::sort` and
 `slice::sort_unstable`, typically on large slices (hundreds of elements or
 more). It performs worse on short slices and when using wide keys
 (16 bytes). See [benchmarks] to get a better picture of the performance
 characteristics.
+
 If you value consistency over speed, see the [`fixed_work`] module. It
 contains sorting functions that perform a fixed number of operations per
 element. This is useful for testing the worst-case scenario, or when you
 don't want the values of the sorted elements to affect the performance.
+
 This implementation is based on radix sort by
 [Pierre Terdiman](http://codercorner.com/RadixSortRevisited.htm),
 with select optimizations published by
 [Michael Herf](http://stereopsis.com/radix.html).
+
 # Examples
+
 Slices of scalar types (integers, floating-point numbers, Booleans, and
 characters) can be sorted directly:
 ```rust
