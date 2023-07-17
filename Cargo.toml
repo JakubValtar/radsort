@@ -11,13 +11,13 @@ homepage = "https://github.com/JakubValtar/radsort"
 categories = ["algorithms", "no-std"]
 keywords = ["sorting", "sort", "radix", "counting"]
 readme = "README.md"
-rust-version = "1.54.0"
+rust-version = "1.60.0"
 
 [dependencies]
 
 [dev-dependencies]
-criterion = "0.4"
-fastrand = "1.9"
+criterion = "0.5"
+fastrand = "2.0"
 radsort-latest = { package = "radsort", version = "=0.1.0" }
 radsort-main = { package = "radsort", git = "https://github.com/JakubValtar/radsort", branch = "main" }
 
