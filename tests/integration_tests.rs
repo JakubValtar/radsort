@@ -196,11 +196,11 @@ fn exception_safety() {
 
     actual.reverse();
 
-    let wrapper = std::panic::AssertUnwindSafe(&mut actual);
+    let mut wrapper = std::panic::AssertUnwindSafe(actual.as_mut_slice());
 
-    std::panic::catch_unwind(move || {
+    let e = std::panic::catch_unwind(move || {
         let mut key_fn_call_count = 0;
-        radsort::sort_by_key(wrapper.0, |v| {
+        radsort::sort_by_key(*wrapper, |v| {
             key_fn_call_count += 1;
             if key_fn_call_count == 250 {
                 // Second sorting pass, the slice is being written to
@@ -211,6 +211,11 @@ fn exception_safety() {
         });
     })
     .expect_err("panic was not thrown");
+
+    assert_eq!(
+        *e.downcast::<&'static str>().expect("unexpected error"),
+        "panic in the key function"
+    );
 
     actual.sort();
     assert_eq!(expected, actual);
