@@ -41,6 +41,9 @@ impl<'a, T> DoubleBuffer<'a, T> {
     /// the write buffer. The read buffer is iterated from the beginning.
     ///
     /// Call `swap` after this function to commit the write buffer state.
+    ///
+    /// Returning an out-of-bounds index from the indexer causes this function
+    /// to immediately return, without iterating over the remaining elements.
     pub fn scatter<F>(&mut self, mut indexer: F)
     where
         F: FnMut(&T) -> usize,

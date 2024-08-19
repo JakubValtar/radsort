@@ -149,16 +149,13 @@ macro_rules! sort_impl {
 
                         let offset = &mut working_offsets[bucket];
 
-                        // Make sure the offset is in bounds. An unreliable key function, which
-                        // returns different keys for the same element when called repeatedly,
-                        // can cause offsets to go out of bounds.
-                        let clamped_offset = usize::min(*offset as usize, len - 1);
+                        let index = *offset as usize;
 
                         // Increment the offset of the bucket. Use wrapping add in case the
                         // key function is unreliable and the bucket overflowed.
                         *offset = offset.wrapping_add(1);
 
-                        clamped_offset
+                        index
                     });
 
                     // Check that each bucket had the same number of insertions as we expected.
