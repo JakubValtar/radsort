@@ -308,9 +308,11 @@ where
     if sz_u8 < sz_u16 && len <= (u8::MAX as usize + 1) {
         return radsort_by_cached_key!(u8);
     }
+    #[cfg(not(target_pointer_width = "16"))]
     if sz_u16 < sz_u32 && len <= (u16::MAX as usize + 1) {
         return radsort_by_cached_key!(u16);
     }
+    #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
     if sz_u32 < sz_usize && len <= (u32::MAX as usize + 1) {
         return radsort_by_cached_key!(u32);
     }
