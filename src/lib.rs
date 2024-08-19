@@ -302,7 +302,9 @@ where
 
     let sz_u8 = core::mem::size_of::<(K, u8)>();
     let sz_u16 = core::mem::size_of::<(K, u16)>();
+    #[cfg(not(target_pointer_width = "16"))]
     let sz_u32 = core::mem::size_of::<(K, u32)>();
+    #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
     let sz_usize = core::mem::size_of::<(K, usize)>();
 
     if sz_u8 < sz_u16 && len <= (u8::MAX as usize + 1) {
